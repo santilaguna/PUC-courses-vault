@@ -1,0 +1,120 @@
+.globl  start
+.data
+    # --- TERREMOTO ---
+    I: .word 4, 3, 93  # porcentajes de cada uno de los ingredientes, siempre suman 100
+    # No modificar
+    Wa: .word 7, 3, 2 	# pesos w_a para el primer perceptron
+    Wb: .word 4, 2, 8 	# pesos w_b para el segundo perceptron
+    U:  .word 450 		# umbral
+    # --- END TERREMOTO ---
+    # de aca para abajo van sus variables en memoria
+.text
+    start:
+        la a7, I  # H = 0(a7), P = 4(a7), G = 8(a7)
+        la t0, U   # leemos direccion umbral
+        lw a6, 0(t0)  # leemos valor umbral
+
+        # llamada para primer perceptron
+        la a2, Wa  # params w_0 = 0(a2), w_1 = 4(a2), w_2 = 8(a2)
+        jal ra, activacion  # llamamos a activacion() y guardamos la direccion actual en ra
+
+        # guardamos primer retorno en a0
+        add a0, zero, a1
+
+        # llamado segundo perceptron
+        la a2, Wb
+        jal ra, activacion
+
+        # revisamos si el terremoto es bueno (a0 y a1 deben ser 1)
+        and a0, a0, a1  # si alguno de los dos es cero a0 será 0 
+        j end
+
+    
+    activacion:  # param W -> return x
+        sw ra, -4(sp)  # guardamos la direccion de retorno al stack (lo que habia del ultimo jal/r)
+        addi sp, sp, -4  # desplazamos el stack
+
+        # calculamos si pasa umbral:
+        lw t5, 0(a7)
+        lw t6, 0(a2)
+        mul t0, t5, t6
+        lw t5, 4(a7)
+        lw t6, 4(a2)
+        mul t1, t5, t6
+        lw t5, 8(a7)
+        lw t6, 8(a2)
+        mul t2, t5, t6
+        add t0, t0, t1
+        add t0, t0, t2
+        add a5, zero, t0
+
+        ## if U < x
+        blt a6, a5, saltar_gtu
+        # U >= x
+            jal ra, act_estu  # llamamos a act_estu() y guardamos la direccion actual en ra
+            j end_saltar
+        # U < x
+            saltar_gtu:
+            jal ra, act_gtu  # llamamos a act_gu() y guardamos la direccion actual en ra
+        end_saltar:
+        
+        ## h(x): if 0 < a
+        blt zero, a1, correcto  # revisamos si es el caso base n = 0
+        ## else, perceptron incorrecto, guardamos 0 como retorno
+            li a1, 0
+            j end_hx
+            # perceptron correcto, guardamos 1 como retorno
+            correcto:
+                li a1, 1
+        end_hx:
+
+        # terminamos la subrutina
+        addi sp, sp, 4  # retrocedemos en el stack
+        lw ra, -4(sp)  # recuperamos direccion y la almacenamos en ra
+        jalr zero, 0(ra)  # llamamos a la direccion que recupera del stack
+
+
+    act_gtu:  # greater than U
+        sw ra, -4(sp)
+        addi sp, sp, -4
+
+        # fuente: https://es.wikipedia.org/wiki/Exponenciaci%C3%B3n_modular
+        li t0, 0  # exponente actual
+        li t1, 1  # valor actual
+        li t2, 3  # para multiplicar
+
+        
+        expo:
+            ## if exponente < x
+            blt t0, a5, do_expo
+            j end_expo
+            do_expo:
+                addi t0, t0, 1
+                mul t1, t1, t2
+                rem t1, t1, a5
+                j expo
+        end_expo:
+            rem a1, t1, t2
+        # terminamos la subrutina
+        addi sp, sp, 4  # retrocedemos en el stack
+        lw ra, -4(sp)  # recuperamos direccion y la almacenamos en ra
+        jalr zero, 0(ra)  # llamamos a la direccion que recupera del stack
+
+
+    act_estu:  # equal or smaller than u
+        # (*) no es necesario pq no hay otra sub-subrutina 
+        sw ra, -4(sp)
+        addi sp, sp, -4
+
+        add t0, zero, a5  # registro auxiliar
+        addi a5, a5, -1  # restamos 1
+        rem a1, a5, t0  # guardamos resto en registro de retorno
+
+        # terminamos la subrutina
+        addi sp, sp, 4 # retrocedemos en el stack
+        lw ra, -4(sp) # recuperamos direccion y la almacenamos en ra
+        jalr zero, 0(ra)  # llamamos a la direccion que recupera del stack
+
+
+    end:
+        # end here, exit or run out of bottom

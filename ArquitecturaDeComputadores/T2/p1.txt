@@ -1,0 +1,275 @@
+# Script p1 T2 Santiago Laguna
+.globl  start
+.data
+    # --- VIAJE ---
+     # No modificar
+    N:        .word 3  # cantidad
+    amigues:  .word 0, 1, 2  # ids (son equivalentes al indice en este arreglo)
+    G:        .word 3  # cantidad gastos
+    # gastos realizados al final del viaje
+    gastos:   .float 0.0, 3000.0, 2.0, 0.0, 1.0, 1.0, 5000.0, 1.0, 2.0, 1.0, 1000.0, -1.0
+    # --- END VIAJE ---
+    # de aca para abajo van sus variables en memoria
+    EndLine:   .asciz " \n"
+    DebeA:     .asciz " debe a "
+    balances:  .float
+    
+.text
+    start:
+   	# guardamos la direccion de los gastos en s1
+    	la s1,gastos
+    	# guardamos la direccion de los balances en s2
+    	la s2,balances
+    	
+    	
+    	la t0, N
+    	lw a2, 0(t0)  # cargamos la cantidad de amigos
+    	li t0, 0
+    	fcvt.s.w ft0, t0  # para cargar un 0 a los balances
+    	
+    iniciar_balances:  # iniciamos en 0
+    	addi a2, a2, -1
+    	fsw  ft0, 0(s2)
+    	addi s2, s2, 4
+    	bnez a2, iniciar_balances
+    	
+    	# arreglar posicion de s2
+    	la t0, N
+    	lw t2, 0(t0)
+ 	li t0, -4
+ 	mul t0, t0, t2
+ 	add s2, s2, t0
+ 	
+ 	
+ 	# cargamos la cantidad de gastos
+ 	la t0, G
+    	lw a2, 0(t0)  
+   	
+    leer_gasto:
+ 	# leemos id pagador
+ 	flw fa0, 0(s1)
+ 	addi s1, s1, 4
+ 	
+ 	# leemos monto a pagar
+ 	flw fa1, 0(s1)
+ 	addi s1, s1, 4
+ 	
+ 	# agregamos monto al balance del id correspondiente
+ 	fcvt.w.s t0, fa0  # cargamos la posicion
+ 	li t4, 4
+ 	mul t0, t0, t4
+ 	add s2, s2, t0
+	flw ft0, 0(s2)  # cargamos monto actual
+	fadd.s ft0, ft0, fa1
+ 	fsw ft0, 0(s2)  # actualizamos monto actual
+ 	sub s2, s2, t0  # arreglamos posicion de balances
+ 	
+ 	# leemos cantidad participantes
+ 	flw fa2, 0(s1)
+ 	addi s1, s1, 4
+
+ 	# cargamos cantidad como int y revisamos si son todos
+ 	fcvt.w.s t0, fa2
+ 	bltz t0, pagan_todos
+ 	
+ 	mv t5, t0
+ 	fdiv.s fa1, fa1, fa2  # actualizar cantidad a pagar por cada participante
+ 	
+ 	
+ 	no_pagan_todos:
+ 		# leemos id siguiente participante
+ 		flw fa0, 0(s1)
+ 		addi s1, s1, 4
+ 		
+ 		# restamos monto al balance del id correspondiente
+ 		fcvt.w.s t0, fa0  # cargamos la posicion
+ 		li t4, 4
+ 		mul t0, t0, t4
+ 		add s2, s2, t0
+		flw ft0, 0(s2)  # cargamos monto actual
+		fsub.s ft0, ft0, fa1
+ 		fsw ft0, 0(s2)  # actualizamos monto actual
+ 		sub s2, s2, t0  # arreglamos posicion de balances
+ 		
+ 		addi t5, t5, -1
+ 		bnez t5, no_pagan_todos	
+ 		
+ 	j siguiente_gasto
+ 	
+     	pagan_todos:
+        	# actualizamos monto que paga cada uno
+        	la t0, N
+    		lw t5, 0(t0)
+ 		fcvt.s.w fa2, t5  # cargamos la cantidad como float
+ 		fdiv.s fa1, fa1, fa2  # actualizar cantidad a pagar
+ 		# guardamos direccion label
+ 		la t3, amigues
+ 		
+ 		loop_todos:
+ 		# leemos id siguiente participante
+ 		lw t0, 0(t3)
+ 		fcvt.s.w fa0, t0
+ 		addi t3, t3, 4
+ 		# restamos monto al balance del id correspondiente
+ 		fcvt.w.s t0, fa0  # cargamos la posicion
+ 		li t4, 4
+ 		mul t0, t0, t4
+ 		add s2, s2, t0
+		flw ft0, 0(s2)  # cargamos monto actual
+		fsub.s ft0, ft0, fa1
+ 		fsw ft0, 0(s2)  # actualizamos monto actual
+ 		sub s2, s2, t0  # arreglamos posicion de balances
+ 		addi t5, t5, -1
+ 		bnez t5, loop_todos		
+ 		# arreglar posicion amigues no es necesario
+
+     siguiente_gasto:
+    	# step
+	addi a2, a2, -1 
+    	bnez a2, leer_gasto
+    
+  
+    pagar:
+        	
+    	# guardamos ids
+    	li a0, -1  # id deudor
+    	li a1, -1  # id acreedor
+    	li a2, 0   # pos actual
+    	# para comparar lista terminada
+    	la t0, N
+    	lw a3, 0(t0)  
+    	# para comparar con float (casi) cero, error 10^-4  (para evitar problemas por precision)
+    	li t0, -1
+    	fcvt.s.w ft0, t0
+    	li t0, 1
+    	fcvt.s.w ft10, t0
+    	li t0, 10000
+    	fcvt.s.w ft11, t0
+    	fdiv.s ft0, ft0, ft11
+    	fdiv.s ft10, ft10, ft11
+    	# para multiplicar float
+    	li t0, -1
+    	fcvt.s.w ft3, t0
+    	
+    	
+    	buscar_deudor:
+    		beq a2, a3, end
+    		# cargamos monto actual
+    		li t4, 4   # buscamos posicion
+ 		mul t0, a2, t4
+ 		add s2, s2, t0
+    		flw ft1, 0(s2)  # en ft1 guardamos monto deudor
+    		sub s2, s2, t0  # arreglamos posicion de balances
+    		# revisamos si es deudor
+    		flt.s t2, ft1, ft0
+    		bgtz t2, buscar_acreedor
+    		# seguimos buscando
+    		addi a2, a2, 1
+    		j buscar_deudor
+    		
+   	buscar_acreedor:
+   		# guardamos posicion deudor y buscamos acreedor
+   		mv a0, a2 
+   		li a2, 0
+   		loop_acreedor:
+   			# nunca deberia haber un deudor sin acreedor
+   			beq a2, a3, end
+   			# cargamos monto actual
+   			li t4, 4   # buscamos posicion
+ 			mul t0, a2, t4
+ 			add s2, s2, t0
+    			flw ft2, 0(s2)  # en ft2 guardamos monto acreedor
+    			sub s2, s2, t0  # arreglamos posicion de balances
+ 			# revisamos si es acreedor
+    			flt.s t2, ft10, ft2
+    			bgtz t2, pago_real
+    			# seguimos buscando
+    			addi a2, a2, 1
+    			j loop_acreedor
+    	pago_real:
+    		# guardamos posicion acreedor
+    		mv a1, a2
+    		li a2, 0
+    		# calculamos diferencia
+    		fmul.s ft1, ft1, ft3  # dejamos el monto en positivo
+    		flt.s t0, ft2, ft1
+    		beqz t0, acreedor_mayor
+    		
+    		# deudor tiene monto mayor o igual, usamos ft2
+    		# cargar deudor en ft4 y sumarle ft2 
+   		li t4, 4   # buscamos posicion
+ 		mul t0, a0, t4  #a0 deudor
+ 		add s2, s2, t0
+  		flw ft4, 0(s2)
+    		fadd.s ft4, ft4, ft2
+ 		fsw ft4, 0(s2)  # actualizamos monto actual
+    		sub s2, s2, t0  # arreglamos posicion de balances
+    		# cargar acreedor en ft4 y restarle ft2
+    		li t4, 4   # buscamos posicion
+ 		mul t0, a1, t4  #a1 acreedor
+ 		add s2, s2, t0
+  		flw ft4, 0(s2)
+    		fsub.s ft4, ft4, ft2
+ 		fsw ft4, 0(s2)  # actualizamos monto actual
+    		sub s2, s2, t0  # arreglamos posicion de balances
+    		# print a0 le debe a a1 ft2
+    		li    a7, 1  #mv    a0, a0
+            	ecall
+        	li    a7, 4
+        	la    a0, DebeA
+        	ecall
+    		li    a7, 1
+            	mv    a0, a1
+            	ecall
+            	li    a7, 4
+        	la    a0, EndLine
+        	ecall
+    		fmv.s fa0, ft2
+    		li a7, 2
+    		ecall
+    		li    a7, 4
+        	la    a0, EndLine
+        	ecall
+    		j buscar_deudor
+    		
+    		acreedor_mayor:  # usamos ft1 (monto adeudado)
+    		# cargar deudor en ft4 y sumarle ft1 
+   		li t4, 4   # buscamos posicion
+ 		mul t0, a0, t4  #a0 deudor
+ 		add s2, s2, t0
+  		flw ft4, 0(s2)
+    		fadd.s ft4, ft4, ft1
+ 		fsw ft4, 0(s2)  # actualizamos monto actual
+    		sub s2, s2, t0  # arreglamos posicion de balances
+    		# cargar acreedor en ft4 y restarle ft1
+    		li t4, 4   # buscamos posicion
+ 		mul t0, a1, t4  #a1 acreedor
+ 		add s2, s2, t0
+  		flw ft4, 0(s2)
+    		fsub.s ft4, ft4, ft1
+ 		fsw ft4, 0(s2)  # actualizamos monto actual
+    		sub s2, s2, t0  # arreglamos posicion de balances
+    		# print a0 le debe a a1 ft1
+    		li    a7, 1  #mv    a0, a0
+            	ecall
+        	li    a7, 4
+        	la    a0, DebeA
+        	ecall
+    		li    a7, 1
+            	mv    a0, a1
+            	ecall
+            	li    a7, 4
+        	la    a0, EndLine
+        	ecall
+    		fmv.s fa0, ft1
+    		li a7, 2
+    		ecall
+    		li    a7, 4
+        	la    a0, EndLine
+        	ecall
+    			
+    		j buscar_deudor
+    	
+    end:
+	li a7, 10
+	ecall

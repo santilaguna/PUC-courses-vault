@@ -1,0 +1,99 @@
+# Script T2 Santiago Laguna
+
+.globl start
+
+.data
+    hello:            .asciz "Hola!\n"
+    AskInputTime:     .asciz "Ingrese un tiempo:\n"
+    StartTimeElapsed: .asciz "Han pasado "
+    EndTimeElapsed:   .asciz " segundos\n"
+    timeNow:          .word 0xFFFF0018
+    cmp:              .word 0xFFFF0020
+    
+.text
+    start:
+        # armar el timer para que dispare al iniciar
+        lw  a0, cmp
+        li  a1, 0
+        sw  a1, 0(a0)
+        
+        # setetar la direccion del handler y activamos las interrupciones
+        la	t0, handle
+        csrrs	zero, 5, t0
+        csrrsi	zero, 4, 0x10
+        csrrsi	zero, 0, 0x1
+        
+        # registro indicador de comienzo
+        li s2, 0
+        # registro indicador de tiempo actual, tiempo inicial ignorado pero debe ser != de cero
+        li s3, 1
+        
+    loop:
+   
+        ## if  zero >= s3
+        bge zero, s3, done
+        j	loop
+
+    handle:
+        # guardar temporales
+        addi	sp, sp, -20
+        sw	t0, 16(sp)
+        sw	t1, 12(sp)
+        sw	t2, 8(sp)
+        sw	a0, 4(sp)
+        sw	a7, 0(sp)
+        
+        ## if s2 == 0
+        beq s2, zero, if_first
+        # s2 != 1
+            # imprimimos string de tiempo que ha pasado
+            li    a7, 4
+       	    la    a0, StartTimeElapsed
+            ecall
+            li    a7, 1
+            mv    a0, s3
+            ecall
+            li    a7, 4
+            la    a0, EndTimeElapsed
+            ecall
+            j end_if_first
+        # s2 == 0
+            if_first:
+            li s2, 1  # La primera vez no imprimimos
+        end_if_first:
+        
+        # imprimimos string para pedir input
+        li    a7, 4
+        la    a0, AskInputTime
+        ecall
+        # real request
+        addi a7, zero, 5 # ReadInt
+        ecall # get int from console, store in a0
+        mv s3, a0  # save value to s3 to print it later
+        
+        ## if  zero >= a0
+        bge zero, a0, end_handle
+        
+        # rearmar el timer para que dispare cada 5 segundos
+        li t1, 1000
+        mul t1, t1, a0
+        
+        lw  a0 timeNow
+        lw  t2 0(a0)
+        add t1 t2 t1
+        lw  t0 cmp
+        sw  t1 0(t0)
+        
+        # recargar temorales y salir
+        lw   t0, 16(sp)
+        lw   t1, 12(sp)
+        lw   t2, 8(sp)
+        lw   a0, 4(sp)
+        lw   a7, 0(sp)    
+    end_handle:
+    	addi sp, sp, 20	
+        uret
+
+    done:
+        li	a7, 10
+        ecall
